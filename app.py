@@ -1,5 +1,5 @@
 import pickle
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import pandas as pd
 
 # Initialize the Flask application
@@ -62,3 +62,33 @@ def predict():
 @app.route('/')
 def index():
     return f"Sales Forecast API is running with {len(models) if models else 0} models loaded.", 200
+
+# This new function handles the web page
+@app.route('/view_forecast', methods=['GET', 'POST'])
+def view_forecast():
+    # Default values for the form
+    sku_input = "DAN-0003"
+    days_input = 7
+    forecast_result = None
+
+    if request.method == 'POST':
+        # Get data from the web form
+        sku_input = request.form.get('sku')
+        days_input = int(request.form.get('days_to_forecast'))
+
+        if sku_input and sku_input in models:
+            # Run the prediction logic
+            model = models[sku_input]
+            future = model.make_future_dataframe(periods=days_input)
+            forecast = model.predict(future)
+
+            # Format the data for the template
+            response_data = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(days_input)
+            response_data['ds'] = response_data['ds'].dt.strftime('%Y-%m-%d')
+            forecast_result = response_data.to_dict(orient='records')
+
+    # Render the HTML page, passing in the data
+    return render_template('result.html', 
+                           forecast_data=forecast_result, 
+                           sku_in=sku_input, 
+                           days_in=days_input)
