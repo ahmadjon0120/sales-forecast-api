@@ -14,19 +14,34 @@ except FileNotFoundError:
     models = None
     print("FATAL ERROR: 'models.pkl' file not found. The API cannot serve predictions.")
 
-# Define the prediction endpoint
+# --- NEW HELPER FUNCTION ---
+# This function contains the core prediction logic, used by both the API and the web page.
+def get_forecast_data(sku, days):
+    """Selects a model and returns a future-only forecast DataFrame."""
+    model = models[sku]
+    future = model.make_future_dataframe(periods=days)
+    forecast = model.predict(future)
+    
+    # Get the last date from the model's own training history
+    last_history_date = model.history_dates.max()
+    
+    # Filter the forecast to keep only the dates AFTER the last training date
+    future_forecast = forecast[forecast['ds'] > last_history_date]
+
+    # Return only the necessary columns from the future-only data
+    return future_forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
+
+# Define the prediction endpoint for machine-to-machine communication (e.g., Power Automate)
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Ensure models were loaded
     if models is None:
         return jsonify({"error": "Models are not loaded, check server logs."}), 500
 
-    # Get JSON data from the request
     data = request.get_json()
     if not data:
         return jsonify({"error": "Invalid input: No JSON data received."}), 400
 
-    # Validate input parameters
     sku = data.get('sku')
     days = data.get('days_to_forecast')
 
@@ -41,14 +56,8 @@ def predict():
     except (ValueError, TypeError):
         return jsonify({"error": "'days_to_forecast' must be an integer."}), 400
 
-    # Select the correct model and make a forecast
-    model = models[sku]
-    future = model.make_future_dataframe(periods=days)
-    forecast = model.predict(future)
-
-    # Prepare the response
-    # Select only the future dates for the response
-    response_data = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(days)
+    # Call the helper function to get the forecast
+    response_data = get_forecast_data(sku, days)
     
     # Convert datetime to string for JSON compatibility
     response_data['ds'] = response_data['ds'].dt.strftime('%Y-%m-%d')
@@ -58,12 +67,7 @@ def predict():
 
     return jsonify(result)
 
-# Add a root endpoint to easily check if the service is running
-@app.route('/')
-def index():
-    return f"Sales Forecast API is running with {len(models) if models else 0} models loaded.", 200
-
-# This new function handles the web page
+# Define the endpoint for the human-readable web page
 @app.route('/view_forecast', methods=['GET', 'POST'])
 def view_forecast():
     # Default values for the form
@@ -72,18 +76,14 @@ def view_forecast():
     forecast_result = None
 
     if request.method == 'POST':
-        # Get data from the web form
         sku_input = request.form.get('sku')
         days_input = int(request.form.get('days_to_forecast'))
 
         if sku_input and sku_input in models:
-            # Run the prediction logic
-            model = models[sku_input]
-            future = model.make_future_dataframe(periods=days_input)
-            forecast = model.predict(future)
-
+            # Call the helper function to get the forecast
+            response_data = get_forecast_data(sku_input, days_input)
+            
             # Format the data for the template
-            response_data = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(days_input)
             response_data['ds'] = response_data['ds'].dt.strftime('%Y-%m-%d')
             forecast_result = response_data.to_dict(orient='records')
 
@@ -92,3 +92,8 @@ def view_forecast():
                            forecast_data=forecast_result, 
                            sku_in=sku_input, 
                            days_in=days_input)
+
+# Add a root endpoint to easily check if the service is running
+@app.route('/')
+def index():
+    return f"Sales Forecast API is running with {len(models) if models else 0} models loaded.", 200
