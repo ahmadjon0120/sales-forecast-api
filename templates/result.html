@@ -2,132 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Forecast - Myer</title>
+    <title>Sales Forecast</title>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            margin: 0;
-            padding: 2em;
-            background-color: #f8f9fa;
-            color: #333;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: #fff;
-            padding: 2em;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1, h2 {
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-        }
-        form {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 2em;
-        }
-        input {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            padding: 9px 15px;
-            border: none;
-            border-radius: 4px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        table { 
-            border-collapse: collapse; 
-            width: 100%; 
-            margin-top: 1em; 
-        }
-        th, td { 
-            border: 1px solid #ddd; 
-            text-align: left; 
-            padding: 12px; 
-        }
-        th { 
-            background-color: #f2f2f2; 
-        }
-        tbody tr:nth-child(odd) {
-            background-color: #f9f9f9;
-        }
+        body { font-family: sans-serif; margin: 2em; }
+        table { border-collapse: collapse; width: 60%; margin-top: 1em; }
+        th, td { border: 1px solid #dddddd; text-align: left; padding: 8px; }
+        th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>SKU Sales Forecast</h1>
+    <h1>SKU Sales Forecast</h1>
 
-        <form method="POST">
-            <label for="sku">SKU:</label>
-            <input type="text" id="sku" name="sku" value="{{ sku_in }}" required>
-            <label for="days">Days to Forecast:</label>
-            <input type="number" id="days" name="days_to_forecast" value="{{ days_in }}" min="1" required>
-            <button type="submit">Get Forecast</button>
-        </form>
+    <form method="POST">
+        <label for="sku">SKU:</label>
+        <input type="text" id="sku" name="sku" value="{{ sku_in }}" required>
+        <label for="days">Days to Forecast:</label>
+        <input type="number" id="days" name="days_to_forecast" value="{{ days_in }}" required>
+        <button type="submit">Get Forecast</button>
+    </form>
 
-        {% if forecast_data %}
-            <h2>Forecast for SKU: {{ sku_in }}</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Forecast</th>
-                        <th>Pessimistic Estimate</th>
-                        <th>Optimistic Estimate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in forecast_data %}
-                    <tr>
-                        <td>{{ row.ds }}</td>
-                        <td>{{ "%.2f"|format(row.yhat) }}</td>
-                        <td>{{ "%.2f"|format(row.yhat_lower) }}</td>
-                        <td>{{ "%.2f"|format(row.yhat_upper) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% endif %}
-
-        <h2>Understanding the Results</h2>
+    {% if forecast_data %}
+        <h2>Forecast for SKU: {{ sku_in }}</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Term</th>
-                    <th>Explanation</th>
+                    <th>Date (ds)</th>
+                    <th>Forecast (yhat)</th>
+                    <th>Lower Estimate</th>
+                    <th>Upper Estimate</th>
                 </tr>
             </thead>
             <tbody>
+                {% for row in forecast_data %}
                 <tr>
-                    <td><strong>ds</strong></td>
-                    <td>The specific date for the forecast.</td>
+                    <td>{{ row.ds }}</td>
+                    <td>{{ "%.2f"|format(row.yhat) }}</td>
+                    <td>{{ "%.2f"|format(row.yhat_lower) }}</td>
+                    <td>{{ "%.2f"|format(row.yhat_upper) }}</td>
                 </tr>
-                <tr>
-                    <td><strong>Forecast (yhat)</strong></td>
-                    <td>The model's best guess for the sales quantity on that date.</td>
-                </tr>
-                <tr>
-                    <td><strong>Pessimistic Estimate (yhat_lower)</strong></td>
-                    <td>The lower boundary of the forecast. The model is confident the actual sales will not be lower than this.</td>
-                </tr>
-                <tr>
-                    <td><strong>Optimistic Estimate (yhat_upper)</strong></td>
-                    <td>The upper boundary of the forecast. The model is confident the actual sales will not be higher than this.</td>
-                </tr>
+                {% endfor %}
             </tbody>
         </table>
-    </div>
+    {% endif %}
+
 </body>
 </html>
