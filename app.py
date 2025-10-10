@@ -1,7 +1,6 @@
 import pickle
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
-import sys # Import the sys library to flush output
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -15,32 +14,26 @@ except FileNotFoundError:
     models = None
     print("FATAL ERROR: 'models.pkl' file not found. The API cannot serve predictions.")
 
-# --- DEBUG VERSION of get_forecast_data ---
 def get_forecast_data(sku, days):
     """Selects a model and returns a future-only forecast DataFrame."""
-    print(f"--- DEBUG: Getting forecast for SKU: {sku} for {days} days. ---", flush=True)
     model = models[sku]
     future = model.make_future_dataframe(periods=days)
     forecast = model.predict(future)
-
-    last_history_date = model.history_dates.max()
-    # --- CRITICAL DEBUG LINE ---
-    print(f"--- DEBUG: Last history date for this model is: {last_history_date} ---", flush=True)
-
-    future_forecast = forecast[forecast['ds'] > last_history_date]
-    print(f"--- DEBUG: Shape of forecast BEFORE filtering: {forecast.shape} ---", flush=True)
-    print(f"--- DEBUG: Shape of forecast AFTER filtering: {future_forecast.shape} ---", flush=True)
     
-    return future_forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+    last_history_date = model.history_dates.max()
+    future_forecast = forecast[forecast['ds'] > last_history_date]
 
+    return future_forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
 @app.route('/predict', methods=['POST'])
 def predict():
     if models is None:
         return jsonify({"error": "Models are not loaded, check server logs."}), 500
+    
     data = request.get_json()
     sku = data.get('sku')
     days = data.get('days_to_forecast')
+
     if not sku or not days:
         return jsonify({"error": "Missing 'sku' or 'days_to_forecast' in request."}), 400
     if sku not in models:
@@ -56,14 +49,28 @@ def predict():
     result = response_data.to_dict(orient='records')
     return jsonify(result)
 
-# ... (the rest of your app.py file can remain the same) ...
-
 @app.route('/view_forecast', methods=['GET', 'POST'])
 def view_forecast():
-    # ... (code for view_forecast) ...
-    pass
+    sku_input = "DAN-0003"
+    days_input = 7
+    forecast_result = None
 
+    if request.method == 'POST':
+        sku_input = request.form.get('sku')
+        days_input = int(request.form.get('days_to_forecast', 7))
+
+        if sku_input and sku_input in models:
+            response_data = get_forecast_data(sku_input, days_input).copy()
+            response_data['ds'] = response_data['ds'].dt.strftime('%Y-%m-%d')
+            forecast_result = response_data.to_dict(orient='records')
+            
+    return render_template('result.html', 
+                           forecast_data=forecast_result, 
+                           sku_in=sku_input, 
+                           days_in=days_input)
+
+# --- THIS FUNCTION IS NOW CORRECT ---
 @app.route('/')
 def index():
-    # ... (code for index) ...
-    pass
+    # This function now correctly returns a status message
+    return f"Sales Forecast API is running with {len(models) if models else 0} models loaded.", 200
